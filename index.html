@@ -1,0 +1,773 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pharm-E-co服務器數據管理台</title>
+    <!-- Chart.js 圖表庫 -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- QRCode.js 生成庫 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <!-- HTML5-QRCode 掃描庫 -->
+    <script src="https://unpkg.com/html5-qrcode"></script>
+
+    <style>
+        :root {
+            --bg-color: #f4f6f9;
+            --glass-bg: rgba(255, 255, 255, 0.82);
+            --glass-border: rgba(255, 255, 255, 0.6);
+            --primary: #4f46e5;
+            --primary-hover: #4338ca;
+            --danger: #ef4444;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --text-main: #1f2937;
+            --text-sub: #4b5563;
+            --border: #d1d5db;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        }
+
+        /* 全局背景圖 */
+        body {
+            background: url('bg.png') no-repeat center center fixed;
+            background-size: cover;
+            color: var(--text-main);
+            min-height: 100vh;
+        }
+
+        /* 🔒 登入視窗樣式 (毛玻璃) */
+        #loginScreen {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100vh;
+            background: rgba(0, 0, 0, 0.15);
+            backdrop-filter: blur(6px);
+            -webkit-backdrop-filter: blur(6px);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
+            padding: 16px;
+        }
+
+        .login-card {
+            background: rgba(255, 255, 255, 0.88);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid var(--glass-border);
+            padding: 36px 28px;
+            border-radius: 20px;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.15);
+            width: 100%;
+            max-width: 400px;
+            text-align: center;
+        }
+
+        .login-card h2 {
+            margin-bottom: 6px;
+            color: var(--primary);
+            font-size: 1.6rem;
+        }
+
+        .login-card p {
+            color: var(--text-sub);
+            margin-bottom: 20px;
+            font-size: 0.9rem;
+            font-weight: 500;
+        }
+
+        .login-input {
+            width: 100%;
+            padding: 12px;
+            margin-bottom: 14px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            font-size: 0.95rem;
+            background: rgba(255, 255, 255, 0.9);
+            color: var(--text-main);
+            outline: none;
+        }
+
+        .login-input:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 2px rgba(79, 70, 229, 0.2);
+        }
+
+        #reader {
+            width: 100%;
+            margin-bottom: 16px;
+            display: none;
+            border-radius: 12px;
+            overflow: hidden;
+            border: 1px solid var(--border);
+            background: #fff;
+        }
+
+        /* 🖥️ 主應用畫面樣式 */
+        #mainApp {
+            display: none;
+            padding: 24px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        /* 通用毛玻璃卡片組件 */
+        header, .config-card, .panel, .modal-content {
+            background: var(--glass-bg);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid var(--glass-border);
+            box-shadow: 0 8px 24px rgba(0,0,0,0.06);
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding: 18px 24px;
+            border-radius: 16px;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+
+        header h1 {
+            font-size: 1.4rem;
+            color: var(--primary);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-weight: 700;
+        }
+
+        .header-actions {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .status-badge, .timer-badge, .role-badge {
+            font-size: 0.85rem;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-weight: 600;
+        }
+        .status-badge { background: #e0e7ff; color: var(--primary); }
+        .timer-badge { background: #ecfdf5; color: var(--success); }
+        .role-badge { background: #fef3c7; color: #d97706; border: 1px solid #fde68a; }
+
+        .config-card {
+            padding: 16px 20px;
+            border-radius: 16px;
+            margin-bottom: 20px;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 12px;
+        }
+
+        .input-group { display: flex; flex-direction: column; gap: 4px; }
+        .input-group label { font-size: 0.8rem; color: var(--text-sub); font-weight: 700; }
+        
+        .input-group input, textarea {
+            padding: 8px 12px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            font-size: 0.9rem;
+            background: rgba(255, 255, 255, 0.9);
+            color: var(--text-main);
+        }
+
+        /* 保持電腦端 400px + 1fr 原有佈局 */
+        .main-grid {
+            display: grid;
+            grid-template-columns: 400px 1fr;
+            gap: 20px;
+        }
+
+        .panel {
+            padding: 20px;
+            border-radius: 16px;
+            margin-bottom: 20px;
+        }
+
+        .panel-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+        .panel-title { font-size: 1rem; font-weight: 700; color: var(--text-main); }
+
+        .btn {
+            padding: 8px 16px;
+            border-radius: 8px;
+            border: none;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 0.88rem;
+            transition: all 0.2s ease;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+        .btn:active { transform: scale(0.97); }
+
+        .btn-primary { background: var(--primary); color: #fff; }
+        .btn-primary:hover { background: var(--primary-hover); }
+        .btn-danger { background: var(--danger); color: #fff; }
+        .btn-danger:hover { background: #dc2626; }
+        .btn-secondary { background: rgba(255,255,255,0.8); color: var(--text-main); border: 1px solid var(--border); }
+        .btn-secondary:hover { background: #f3f4f6; }
+        .btn-warning { background: var(--warning); color: #fff; }
+        .btn-warning:hover { background: #d97706; }
+        .btn-dark { background: #374151; color: #fff; }
+        .btn-dark:hover { background: #1f2937; }
+
+        .table-container { overflow-x: auto; max-height: 420px; overflow-y: auto; border-radius: 8px; }
+        table { width: 100%; border-collapse: collapse; text-align: left; font-size: 0.88rem; }
+        th, td { padding: 10px 12px; border-bottom: 1px solid rgba(0,0,0,0.06); word-break: break-all; }
+        th { background: rgba(249, 250, 251, 0.85); position: sticky; top: 0; color: var(--text-sub); font-weight: 700; }
+        tr:hover { background: rgba(255, 255, 255, 0.5); }
+
+        .form-grid { display: flex; flex-direction: column; gap: 12px; }
+        textarea { resize: vertical; min-height: 70px; font-family: inherit; }
+
+        .charts-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+        .chart-card { background: rgba(255, 255, 255, 0.75); margin-bottom: 0; }
+        .chart-container { position: relative; height: 200px; width: 100%; }
+        .latest-val { font-weight: 700; color: var(--primary); font-size: 0.95rem; }
+
+        #toast { position: fixed; bottom: 20px; right: 20px; padding: 12px 20px; border-radius: 10px; background: rgba(31, 41, 55, 0.9); backdrop-filter: blur(8px); color: #fff; display: none; box-shadow: 0 10px 20px rgba(0,0,0,0.15); z-index: 1000; font-size: 0.9rem; }
+
+        /* 彈出視窗 (Modal) */
+        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.3); z-index: 2000; justify-content: center; align-items: center; backdrop-filter: blur(6px); padding: 16px; }
+        .modal-content { padding: 30px; border-radius: 20px; text-align: center; width: 100%; max-width: 360px; }
+        .modal-content h3 { margin-bottom: 20px; color: var(--text-main); }
+        #qrcode-display { display: flex; justify-content: center; margin-bottom: 24px; padding: 12px; background: #fff; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
+
+        /* 📱 響應式兼容適配 (平板與手機) */
+        @media (max-width: 992px) {
+            .main-grid { grid-template-columns: 1fr; }
+        }
+
+        @media (max-width: 600px) {
+            #mainApp { padding: 12px; }
+            header { padding: 14px; flex-direction: column; align-items: flex-start; }
+            header h1 { font-size: 1.2rem; }
+            .header-actions { width: 100%; justify-content: space-between; gap: 8px; }
+            .header-actions .btn { padding: 6px 12px; font-size: 0.8rem; }
+            .config-card { grid-template-columns: 1fr; }
+            .charts-grid { grid-template-columns: 1fr; }
+            .panel { padding: 14px; }
+        }
+    </style>
+</head>
+<body>
+
+<!-- 🔒 登入介面 -->
+<div id="loginScreen">
+    <div class="login-card">
+        <h2>📈 Pharm-E-co</h2>
+        <p>服務器數據管理台</p>
+
+        <!-- 掃碼相機顯示區域 -->
+        <div id="reader"></div>
+
+        <input type="text" id="loginUser" class="login-input" placeholder="請輸入使用者名稱">
+        <input type="password" id="loginPass" class="login-input" placeholder="請輸入密碼">
+        
+        <div style="display: flex; gap: 10px; margin-top: 6px;">
+            <button class="btn btn-primary" style="flex: 1;" onclick="handleLogin()">登入</button>
+            <button class="btn btn-dark" style="flex: 1;" onclick="startQRScanner()">📷 掃碼登入</button>
+        </div>
+        <p id="loginError" style="color: var(--danger); margin-top: 12px; display: none; word-break: break-all; font-size: 0.85rem; font-weight: 600;"></p>
+    </div>
+</div>
+
+<!-- 🖥️ 主應用介面 -->
+<div id="mainApp">
+    <div class="container">
+        <header>
+            <h1>📈 Pharm-E-co數據管理台</h1>
+            <div class="header-actions">
+                <span class="role-badge" id="displayRole">身分: 未知</span>
+                <button class="btn btn-warning" id="btnCustomQR" onclick="generateCustomPointsQR()">🎫 自定義數量積分</button>
+                <span class="timer-badge">⏳ <span id="timerSec">20</span> 秒</span>
+                <span class="status-badge" id="apiStatus">連接中</span>
+                <button class="btn btn-primary" onclick="manualRefresh()">🔄 刷新</button>
+                <button class="btn btn-danger" onclick="logout()">🚪 登出</button>
+            </div>
+        </header>
+
+        <!-- API 設定區 (僅管理員可見，默認填好) -->
+        <div class="config-card" id="configCard">
+            <div class="input-group">
+                <label>API 接口地址</label>
+                <input type="text" id="apiUrl" value="https://tinywebdb.appinventor.space/api">
+            </div>
+            <div class="input-group">
+                <label>服務器用戶名 (user)</label>
+                <input type="text" id="apiUser" value="ryolin">
+            </div>
+            <div class="input-group">
+                <label>服務器密鑰 (secret)</label>
+                <input type="password" id="apiSecret" value="0764433e">
+            </div>
+        </div>
+
+        <div class="main-grid">
+            <!-- 左側：控制面板與數據清單 -->
+            <div>
+                <!-- 新增 / 修改數據框 (僅管理員可見) -->
+                <div class="panel" id="editPanel">
+                    <div class="panel-header">
+                        <span class="panel-title">✏️ 寫入/修改數據 (Update)</span>
+                    </div>
+                    <div class="form-grid">
+                        <div class="input-group">
+                            <label>標籤名稱 (Tag)</label>
+                            <input type="text" id="inputTag" placeholder="如: temp, speed...">
+                        </div>
+                        <div class="input-group">
+                            <label>標籤值 (Value)</label>
+                            <textarea id="inputValue" placeholder="輸入數字或文本"></textarea>
+                        </div>
+                        <button class="btn btn-primary" onclick="saveData()">提交保存</button>
+                    </div>
+                </div>
+
+                <!-- 數據列表表單 -->
+                <div class="panel">
+                    <div class="panel-header">
+                        <span class="panel-title">📋 數據總覽</span>
+                        <input type="text" id="searchInput" placeholder="搜尋..." oninput="filterTable()" style="padding: 4px 8px; border-radius: 6px; border: 1px solid var(--border); width: 110px;">
+                    </div>
+                    <div class="table-container">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Tag</th>
+                                    <th>Value</th>
+                                    <th id="thActions">操作</th>
+                                </tr>
+                            </thead>
+                            <tbody id="dataTableBody">
+                                <tr><td colspan="3" style="text-align:center;">讀取中...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 右側：動態生成每個數值的獨立折線圖 -->
+            <div>
+                <div class="panel" style="margin-bottom: 0; min-height: 100%;">
+                    <div class="panel-header">
+                        <span class="panel-title">📊 數值型數據歷史趨勢 (折線圖)</span>
+                    </div>
+                    <div id="chartsGrid" class="charts-grid">
+                        <div style="grid-column: 1/-1; text-align:center; color: var(--text-sub); padding: 40px 0;">
+                            尚無數據或未檢測到數值型 Tag
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="toast"></div>
+
+<!-- QR Code 彈出視窗 -->
+<div id="qrModal" class="modal-overlay">
+    <div class="modal-content">
+        <h3 id="qrTitle">積分 QR Code</h3>
+        <div id="qrcode-display"></div>
+        <button class="btn btn-secondary" onclick="closeQRModal()" style="width: 100%;">關閉視窗</button>
+    </div>
+</div>
+
+<script>
+    // --- 系統狀態變數 ---
+    let currentUserRole = null; // 'admin' 或 'guest'
+    let globalData = [];
+    let tagHistory = {};       
+    let chartInstances = {};   
+    let countdown = 20;
+    let timerInterval = null;
+    let html5QrcodeScanner = null;
+
+    // --- 初始化：自動讀取記憶的登入狀態 ---
+    window.onload = () => {
+        const savedRole = localStorage.getItem('pharm_role');
+        if (savedRole === 'admin' || savedRole === 'guest') {
+            enterDashboard(savedRole);
+        }
+    };
+
+    // --- 登入與權限邏輯 ---
+    function handleLogin() {
+        const user = document.getElementById('loginUser').value.trim();
+        const pass = document.getElementById('loginPass').value.trim();
+        verifyCredentials(user, pass);
+    }
+
+    function verifyCredentials(user, pass) {
+        const err = document.getElementById('loginError');
+        if (user === 'PLKCWC' && pass === 'PLKCWC') {
+            err.style.display = 'none';
+            enterDashboard('admin');
+        } else if (user === 'User' && pass === 'PH11') {
+            err.style.display = 'none';
+            enterDashboard('guest');
+        } else {
+            err.innerText = "❌ 帳號或密碼錯誤！";
+            err.style.display = 'block';
+        }
+    }
+
+    // 啟動相機掃描 QR Code
+    function startQRScanner() {
+        const readerDiv = document.getElementById('reader');
+        readerDiv.style.display = 'block';
+        document.getElementById('loginError').style.display = 'none';
+
+        if (html5QrcodeScanner && html5QrcodeScanner.isScanning) {
+            return;
+        }
+
+        if (!html5QrcodeScanner) {
+            html5QrcodeScanner = new Html5Qrcode("reader");
+        }
+        
+        html5QrcodeScanner.start(
+            { facingMode: "environment" }, 
+            { fps: 10, qrbox: { width: 220, height: 220 } },
+            (decodedText) => {
+                const scanResult = decodedText.trim();
+                
+                // 成功掃碼後關閉相機並判斷權限
+                html5QrcodeScanner.stop().then(() => {
+                    readerDiv.style.display = 'none';
+                    
+                    if (scanResult === 'PLKCWC/PLKCWC') {
+                        enterDashboard('admin');
+                    } else if (scanResult === 'User/PH11') {
+                        enterDashboard('guest');
+                    } else {
+                        const err = document.getElementById('loginError');
+                        err.innerText = `❌ 無效的權限碼: [${scanResult}]`;
+                        err.style.display = 'block';
+                    }
+                }).catch((err) => {
+                    console.error("相機關閉時出錯", err);
+                });
+            },
+            (errorMessage) => {}
+        ).catch(err => {
+            alert("無法啟動相機！\n1. 請確認網頁為 HTTPS 或 Localhost 環境\n2. 請允許瀏覽器的相機存取權限");
+            readerDiv.style.display = 'none';
+        });
+    }
+
+    // 進入控制台並設置權限顯示
+    function enterDashboard(role) {
+        currentUserRole = role;
+        localStorage.setItem('pharm_role', role);
+
+        if (html5QrcodeScanner && html5QrcodeScanner.isScanning) {
+            html5QrcodeScanner.stop().catch(()=>{});
+        }
+
+        document.getElementById('loginScreen').style.display = 'none';
+        document.getElementById('mainApp').style.display = 'block';
+        
+        if (role === 'admin') {
+            document.getElementById('displayRole').innerText = "👑 管理員";
+            document.getElementById('configCard').style.display = 'grid';
+            document.getElementById('editPanel').style.display = 'block';
+            document.getElementById('btnCustomQR').style.display = 'inline-block';
+            document.getElementById('thActions').style.display = 'table-cell';
+        } else if (role === 'guest') {
+            document.getElementById('displayRole').innerText = "👁️ 訪客模式";
+            document.getElementById('configCard').style.display = 'none';
+            document.getElementById('editPanel').style.display = 'none';
+            document.getElementById('btnCustomQR').style.display = 'none';
+            document.getElementById('thActions').style.display = 'none';
+        }
+
+        startTimer();
+        refreshData(true);
+    }
+
+    // 登出
+    function logout() {
+        localStorage.removeItem('pharm_role');
+        currentUserRole = null;
+        if (timerInterval) clearInterval(timerInterval);
+        document.getElementById('loginUser').value = '';
+        document.getElementById('loginPass').value = '';
+        document.getElementById('mainApp').style.display = 'none';
+        document.getElementById('loginScreen').style.display = 'flex';
+    }
+
+    // --- 數據 API 操作與渲染 ---
+
+    function startTimer() {
+        if (timerInterval) clearInterval(timerInterval);
+        countdown = 20;
+        document.getElementById('timerSec').innerText = countdown;
+        timerInterval = setInterval(() => {
+            countdown--;
+            document.getElementById('timerSec').innerText = countdown;
+            if (countdown <= 0) {
+                countdown = 20;
+                refreshData(true);
+            }
+        }, 1000);
+    }
+
+    function manualRefresh() {
+        refreshData(false);
+        countdown = 20;
+        document.getElementById('timerSec').innerText = countdown;
+    }
+
+    function getSafeId(tag) {
+        return 'tag_' + btoa(unescape(encodeURIComponent(tag))).replace(/=/g, '').replace(/[^a-zA-Z0-9]/g, '_');
+    }
+
+    async function apiPost(action, extraParams = {}) {
+        const url = document.getElementById('apiUrl').value.trim();
+        const user = document.getElementById('apiUser').value.trim();
+        const secret = document.getElementById('apiSecret').value.trim();
+
+        const formData = new URLSearchParams();
+        formData.append('user', user);
+        formData.append('secret', secret);
+        formData.append('action', action);
+
+        for (const key in extraParams) {
+            formData.append(key, extraParams[key]);
+        }
+
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
+            body: formData.toString()
+        });
+
+        if (!response.ok) throw new Error('網絡請求失敗 HTTP ' + response.status);
+
+        const rawText = await response.text();
+        try { return JSON.parse(rawText); } catch (e) { return rawText; }
+    }
+
+    async function refreshData(isAuto = false) {
+        try {
+            document.getElementById('apiStatus').innerText = '加載中...';
+            
+            const res = await apiPost('search', { tag: '', type: 'both', no: 1, count: 100 });
+            document.getElementById('apiStatus').innerText = '在線';
+
+            let parsedList = [];
+            if (Array.isArray(res)) {
+                if (res.length > 0 && Array.isArray(res[0])) {
+                    parsedList = res.map(item => ({ tag: String(item[0]), value: String(item[1]) }));
+                } else if (res[0] === 'VALUE') {
+                    parsedList = [{ tag: String(res[1]), value: String(res[2]) }];
+                } else {
+                    parsedList = res.map((item, idx) => ({ tag: `Item_${idx}`, value: JSON.stringify(item) }));
+                }
+            } else if (typeof res === 'object' && res !== null) {
+                parsedList = Object.keys(res).map(k => ({ tag: k, value: String(res[k]) }));
+            }
+
+            globalData = parsedList;
+            renderTable(globalData);
+
+            const now = new Date();
+            const timeStr = now.toTimeString().split(' ')[0]; 
+            const currentNumericTags = new Set();
+
+            parsedList.forEach(item => {
+                const valNum = parseFloat(item.value);
+                if (!isNaN(valNum) && item.value.trim() !== '') {
+                    currentNumericTags.add(item.tag);
+                    if (!tagHistory[item.tag]) tagHistory[item.tag] = [];
+                    if (tagHistory[item.tag].length >= 15) tagHistory[item.tag].shift();
+                    tagHistory[item.tag].push({ time: timeStr, value: valNum });
+                }
+            });
+
+            updateLineCharts(currentNumericTags);
+            if (!isAuto) showToast('數據更新成功');
+        } catch (e) {
+            console.error(e);
+            document.getElementById('apiStatus').innerText = '錯誤';
+            if(!isAuto) showToast('服務器連線失敗');
+        }
+    }
+
+    function renderTable(data) {
+        const tbody = document.getElementById('dataTableBody');
+        tbody.innerHTML = '';
+        if (data.length === 0) {
+            const colspan = currentUserRole === 'admin' ? 3 : 2;
+            tbody.innerHTML = `<tr><td colspan="${colspan}" style="text-align:center;">數據庫為空</td></tr>`;
+            return;
+        }
+
+        data.forEach(item => {
+            const tr = document.createElement('tr');
+            let html = `
+                <td><strong>${escapeHtml(item.tag)}</strong></td>
+                <td><code>${escapeHtml(item.value)}</code></td>
+            `;
+            if (currentUserRole === 'admin') {
+                html += `
+                <td>
+                    <button class="btn btn-secondary" style="padding:2px 6px; font-size:0.75rem;" onclick="editTag('${escapeJs(item.tag)}', '${escapeJs(item.value)}')">改</button>
+                    <button class="btn btn-danger" style="padding:2px 6px; font-size:0.75rem;" onclick="deleteTag('${escapeJs(item.tag)}')">刪</button>
+                </td>`;
+            }
+            tr.innerHTML = html;
+            tbody.appendChild(tr);
+        });
+    }
+
+    function updateLineCharts(numericTagsSet) {
+        const container = document.getElementById('chartsGrid');
+        for (let tag in chartInstances) {
+            if (!numericTagsSet.has(tag)) {
+                chartInstances[tag].destroy();
+                delete chartInstances[tag];
+                const card = document.getElementById(`card_${getSafeId(tag)}`);
+                if (card) card.remove();
+            }
+        }
+
+        if (numericTagsSet.size === 0) {
+            container.innerHTML = '<div style="grid-column: 1/-1; text-align:center; padding: 40px 0;">無數值型數據</div>';
+            return;
+        }
+
+        if (container.children.length === 1 && container.children[0].innerText.includes('無數值')) container.innerHTML = '';
+
+        numericTagsSet.forEach(tag => {
+            const safeId = getSafeId(tag);
+            let card = document.getElementById(`card_${safeId}`);
+
+            if (!card) {
+                card = document.createElement('div');
+                card.id = `card_${safeId}`;
+                card.className = 'panel chart-card';
+                card.innerHTML = `
+                    <div class="panel-header">
+                        <span class="panel-title">📌 ${escapeHtml(tag)}</span>
+                        <span class="latest-val" id="val_${safeId}">--</span>
+                    </div>
+                    <div class="chart-container"><canvas id="canvas_${safeId}"></canvas></div>
+                `;
+                container.appendChild(card);
+            }
+
+            const history = tagHistory[tag] || [];
+            const latest = history.length > 0 ? history[history.length - 1].value : '--';
+            document.getElementById(`val_${safeId}`).innerText = `當前: ${latest}`;
+
+            const ctx = document.getElementById(`canvas_${safeId}`).getContext('2d');
+            const labels = history.map(h => h.time);
+            const dataValues = history.map(h => h.value);
+
+            if (chartInstances[tag]) {
+                chartInstances[tag].data.labels = labels;
+                chartInstances[tag].data.datasets[0].data = dataValues;
+                chartInstances[tag].update();
+            } else {
+                chartInstances[tag] = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: labels,
+                        datasets: [{ label: tag, data: dataValues, borderColor: '#4f46e5', backgroundColor: 'rgba(79, 70, 229, 0.12)', borderWidth: 2, fill: true, tension: 0.3, pointRadius: 3 }]
+                    },
+                    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { grid: { display: false }, ticks: { font: { size: 10 } } }, y: { ticks: { font: { size: 10 } } } } }
+                });
+            }
+        });
+    }
+
+    // --- 權限功能 ---
+
+    async function saveData() {
+        if (currentUserRole !== 'admin') return;
+        const tag = document.getElementById('inputTag').value.trim();
+        const value = document.getElementById('inputValue').value.trim();
+        if (!tag) { showToast('請填寫 Tag！'); return; }
+
+        try {
+            await apiPost('update', { tag: tag, value: value });
+            showToast(`已保存: ${tag}`);
+            document.getElementById('inputTag').value = '';
+            document.getElementById('inputValue').value = '';
+            manualRefresh();
+        } catch (e) { showToast('保存失敗'); }
+    }
+
+    async function deleteTag(tag) {
+        if (currentUserRole !== 'admin') return;
+        if (!confirm(`確定要刪除標籤 [${tag}] 嗎？`)) return;
+        try {
+            await apiPost('delete', { tag: tag });
+            showToast(`已刪除: ${tag}`);
+            manualRefresh();
+        } catch (e) { showToast('刪除失敗'); }
+    }
+
+    function editTag(tag, value) {
+        if (currentUserRole !== 'admin') return;
+        document.getElementById('inputTag').value = tag;
+        document.getElementById('inputValue').value = value;
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function generateCustomPointsQR() {
+        if (currentUserRole !== 'admin') return;
+
+        let input = prompt("請輸入要生成的積分數量 (範圍：1 - 9999)：");
+        if (input === null) return; 
+
+        let num = parseInt(input, 10);
+        if (isNaN(num) || num < 1 || num > 9999) {
+            alert("⚠️ 只能輸入 1 到 9999 之間的純數字！");
+            return;
+        }
+
+        document.getElementById('qrModal').style.display = 'flex';
+        document.getElementById('qrTitle').innerText = `生成成功：${num} 積分`;
+        const qrContainer = document.getElementById('qrcode-display');
+        qrContainer.innerHTML = '';
+        new QRCode(qrContainer, { text: String(num), width: 220, height: 220, colorDark : "#1f2937", colorLight : "#ffffff", correctLevel : QRCode.CorrectLevel.H });
+    }
+
+    function closeQRModal() { document.getElementById('qrModal').style.display = 'none'; }
+
+    function filterTable() {
+        const query = document.getElementById('searchInput').value.toLowerCase();
+        renderTable(globalData.filter(d => d.tag.toLowerCase().includes(query) || d.value.toLowerCase().includes(query)));
+    }
+
+    function showToast(msg) {
+        const toast = document.getElementById('toast');
+        toast.innerText = msg;
+        toast.style.display = 'block';
+        setTimeout(() => { toast.style.display = 'none'; }, 3000);
+    }
+
+    function escapeHtml(str) { return str.replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[m])); }
+    function escapeJs(str) { return str.replace(/'/g, "\\'").replace(/"/g, '\\"'); }
+</script>
+</body>
+</html>

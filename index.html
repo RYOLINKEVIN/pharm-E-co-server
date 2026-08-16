@@ -1,0 +1,1021 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title data-i18n="appTitle">Pharm-E-co服務器數據管理台</title>
+    <!-- Chart.js 圖表庫 -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- QRCode.js 生成庫 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <!-- HTML5-QRCode 掃描庫 -->
+    <script src="https://unpkg.com/html5-qrcode"></script>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['system-ui', '-apple-system', 'BlinkMacSystemFont', '"SF Pro Text"', '"Segoe UI"', 'Roboto', 'Helvetica', 'Arial', 'sans-serif'],
+                    },
+                    colors: {
+                        apple: {
+                            bg: '#000000',
+                            card: 'rgba(255, 255, 255, 0.65)',
+                            border: 'rgba(255, 255, 255, 0.4)',
+                            text: '#1d1d1f',
+                            subtext: '#505055',
+                            blue: '#0071e3',
+                            blueHover: '#0077ED',
+                            red: '#ff3b30',
+                            orange: '#ff9500',
+                            green: '#34c759'
+                        }
+                    },
+                    boxShadow: {
+                        'apple': '0 8px 32px rgba(0,0,0,0.15)',
+                        'apple-sm': '0 2px 12px rgba(0,0,0,0.08)',
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style type="text/tailwindcss">
+        :root {
+            --primary: #0071e3;
+            --danger: #ff3b30;
+            --success: #34c759;
+            --warning: #ff9500;
+            --text-main: #1d1d1f;
+            --text-sub: #86868b;
+        }
+
+        /* 🍎 Apple Music 風格暗色流動漸變背景 */
+        body {
+            background: linear-gradient(
+                -45deg, 
+                #000000, /* 極致黑 */
+                #1b0044, /* 深邃紫 */
+                #001659, /* 幽暗藍 */
+                #4a3800, /* 復古暗黃 */
+                #1b0044  /* 循環紫 */
+            );
+            background-size: 400% 400%;
+            animation: appleMusicFlow 8s ease infinite; /* 8秒柔和流動 */
+            background-attachment: fixed;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* 定義流動動畫關鍵影格 */
+        @keyframes appleMusicFlow {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
+        @layer components {
+            .glass-card {
+                @apply bg-apple-card backdrop-blur-3xl border border-apple-border shadow-apple rounded-[2rem] transition-all duration-500;
+            }
+            .apple-input {
+                @apply w-full bg-white/40 hover:bg-white/60 focus:bg-white border border-transparent focus:border-apple-blue/50 focus:shadow-[0_0_0_4px_rgba(0,113,227,0.15)] rounded-2xl px-4 py-3.5 text-apple-text placeholder-gray-500 focus:outline-none transition-all duration-300;
+            }
+            .apple-btn {
+                @apply px-5 py-2.5 rounded-full font-semibold text-[0.9rem] transition-all duration-200 active:scale-95 flex items-center justify-center gap-2;
+            }
+            .btn-primary { @apply bg-apple-blue text-white hover:bg-apple-blueHover shadow-md; }
+            .btn-secondary { @apply bg-white/60 text-apple-text hover:bg-white/80 backdrop-blur-md shadow-sm; }
+            .btn-danger { @apply bg-apple-red text-white hover:bg-red-600 shadow-md; }
+            .btn-warning { @apply bg-apple-orange text-white hover:bg-orange-500 shadow-md; }
+            .btn-dark { @apply bg-[#1d1d1f] text-white hover:bg-black shadow-md; }
+            .apple-label { @apply block text-[0.85rem] font-semibold text-apple-subtext mb-1.5 ml-1; }
+
+            /* JS 自動生成的元件對接 Tailwind */
+            .panel { @apply glass-card p-6 mb-6; }
+            .chart-card { @apply p-5 mb-0 flex flex-col justify-between; }
+            .panel-header { @apply flex justify-between items-center mb-5; }
+            .panel-title { @apply text-lg font-bold text-apple-text; }
+            .latest-val { @apply font-bold text-apple-blue text-sm bg-apple-blue/15 px-3 py-1 rounded-full; }
+
+            /* 徽章 */
+            .status-badge { @apply bg-apple-blue/15 text-apple-blue text-[0.8rem] font-bold px-3 py-1.5 rounded-full backdrop-blur-md; }
+            .timer-badge { @apply bg-apple-green/15 text-apple-green text-[0.8rem] font-bold px-3 py-1.5 rounded-full backdrop-blur-md; }
+            .role-badge { @apply bg-apple-orange/15 text-apple-orange text-[0.8rem] font-bold px-3 py-1.5 rounded-full border border-apple-orange/20 backdrop-blur-md; }
+
+            /* 表格 */
+            .table-container { @apply overflow-x-auto max-h-[420px] rounded-2xl border border-white/40 bg-white/30 backdrop-blur-xl shadow-inner; }
+            th { @apply sticky top-0 bg-white/70 backdrop-blur-xl text-apple-subtext font-bold text-[0.8rem] uppercase tracking-wider py-3 px-4 border-b border-white/50 z-10; }
+            td { @apply py-3.5 px-4 border-b border-white/30 text-[0.9rem] font-medium text-apple-text; }
+            tr:hover td { @apply bg-white/40; }
+
+            /* 模態視窗 */
+            .modal-overlay { @apply fixed inset-0 bg-black/40 backdrop-blur-lg z-[10000] flex justify-center items-center p-4; }
+            .modal-content { @apply bg-white/80 backdrop-blur-2xl border border-white/60 shadow-2xl rounded-[2rem] p-8 w-full max-w-sm text-center transform transition-all; }
+        }
+
+        /* 捲軸美化 */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.2); border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: rgba(0,0,0,0.4); }
+
+        #reader, #giftReader { border-radius: 1.5rem; overflow: hidden; border: none; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.5); }
+        textarea { resize: vertical; min-height: 80px; }
+        
+        .tag-note {
+            font-size: 0.75rem;
+            color: var(--primary);
+            background: rgba(0, 113, 227, 0.15);
+            padding: 2px 8px;
+            border-radius: 8px;
+            font-weight: 600;
+            display: inline-block;
+            margin-left: 6px;
+        }
+
+        #toast {
+            @apply fixed bottom-8 left-1/2 -translate-x-1/2 md:left-auto md:right-8 md:-translate-x-0 px-6 py-3 rounded-full bg-white/90 backdrop-blur-xl text-apple-text font-semibold text-sm shadow-2xl z-[10000] border border-white/50;
+            display: none;
+        }
+    </style>
+</head>
+<body class="text-apple-text selection:bg-apple-blue/20">
+
+<!-- 🌐 語言選擇彈窗 -->
+<div id="firstLangModal" class="modal-overlay" style="display:none;">
+    <div class="modal-content">
+        <h3 class="text-xl font-bold mb-6 leading-relaxed">🌐 請選擇語言<br><span class="text-[0.95rem] text-apple-subtext font-medium">Please Select Language</span></h3>
+        <div class="flex flex-col gap-3">
+            <button class="apple-btn btn-primary w-full py-3.5 text-[1rem]" onclick="selectInitialLanguage('zh-TW')">🇭🇰 繁體中文</button>
+            <button class="apple-btn btn-secondary w-full py-3.5 text-[1rem]" onclick="selectInitialLanguage('en')">🇺🇸 English</button>
+        </div>
+    </div>
+</div>
+
+<!-- 🔒 登入介面 -->
+<div id="loginScreen" class="fixed inset-0 flex items-center justify-center p-4 z-[9999]">
+    <div class="glass-card p-10 w-full max-w-[400px] text-center relative shadow-2xl border border-white/50">
+        <button class="absolute top-4 right-4 apple-btn btn-secondary !px-3 !py-1 !text-xs" onclick="toggleLanguage()">🌐 EN / 繁中</button>
+        <div class="w-16 h-16 bg-gradient-to-tr from-apple-blue to-indigo-400 rounded-[1.25rem] mx-auto mb-4 flex items-center justify-center shadow-lg shadow-blue-500/40">
+            <span class="text-white text-2xl">📈</span>
+        </div>
+        <h2 class="text-2xl font-bold tracking-tight mb-1">Pharm-E-co</h2>
+        <p class="text-apple-subtext text-sm font-medium mb-8" data-i18n="loginSub">服務器數據管理台</p>
+
+        <div id="reader" class="mb-5 hidden bg-white"></div>
+
+        <div class="space-y-4 mb-6">
+            <input type="text" id="loginUser" class="apple-input" data-i18n-ph="loginUserPH" placeholder="請輸入使用者名稱">
+            <input type="password" id="loginPass" class="apple-input" data-i18n-ph="loginPassPH" placeholder="請輸入密碼">
+        </div>
+        
+        <div class="flex gap-3 mt-2">
+            <button class="apple-btn btn-primary flex-1 py-3.5" onclick="handleLogin()" data-i18n="btnLogin">登入</button>
+            <button class="apple-btn btn-dark flex-1 py-3.5" onclick="startQRScanner()" data-i18n="btnScanLogin">📷 掃碼登入</button>
+        </div>
+        <p id="loginError" class="text-apple-red mt-4 hidden break-all text-sm font-semibold"></p>
+    </div>
+</div>
+
+<!-- 🖥️ 主應用介面 -->
+<div id="mainApp" class="hidden max-w-7xl mx-auto p-4 md:p-8 space-y-6">
+    <!-- Header -->
+    <header class="glass-card px-6 py-5 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <h1 class="text-[1.35rem] font-bold text-apple-text tracking-tight flex items-center gap-2" data-i18n="dashTitle">
+            <span class="text-apple-blue">📈</span> Pharm-E-co數據管理台
+        </h1>
+        <div class="flex flex-wrap items-center gap-2.5">
+            <button class="apple-btn btn-secondary !py-1.5 !px-3 !text-xs" onclick="toggleLanguage()">🌐 EN / 繁中</button>
+            <span class="role-badge" id="displayRole">身分: 未知</span>
+            <button class="apple-btn btn-warning !py-1.5 !text-xs" id="btnRedeemGift" onclick="startGiftRedeemScanner()" data-i18n="btnRedeemGift">🎁 兌換禮品</button>
+            <button class="apple-btn btn-warning !py-1.5 !text-xs" id="btnCustomQR" onclick="generateCustomPointsQR()" data-i18n="btnCustomQR">🎫 自定義數量積分</button>
+            <span class="timer-badge">⏳ <span id="timerSec">20</span> <span data-i18n="unitSec">秒</span></span>
+            <span class="status-badge" id="apiStatus">連接中</span>
+            <button class="apple-btn btn-primary !py-1.5 !px-4 !text-xs" onclick="manualRefresh()" data-i18n="btnRefresh">🔄 刷新</button>
+            <button class="apple-btn btn-dark !py-1.5 !px-4 !text-xs" onclick="logout()" data-i18n="btnLogout">🚪 登出</button>
+        </div>
+    </header>
+
+    <!-- API 設定區 -->
+    <div class="glass-card p-6 grid grid-cols-1 md:grid-cols-3 gap-5 hidden" id="configCard">
+        <div>
+            <label class="apple-label" data-i18n="apiUrlLabel">API 接口地址</label>
+            <input type="text" id="apiUrl" class="apple-input !py-2.5" value="https://tinywebdb.appinventor.space/api">
+        </div>
+        <div>
+            <label class="apple-label" data-i18n="apiUserLabel">服務器用戶名 (user)</label>
+            <input type="text" id="apiUser" class="apple-input !py-2.5" value="ryolin">
+        </div>
+        <div>
+            <label class="apple-label" data-i18n="apiSecretLabel">服務器密鑰 (secret)</label>
+            <input type="password" id="apiSecret" class="apple-input !py-2.5" value="0764433e">
+        </div>
+    </div>
+
+    <!-- 👥 總使用人數顯示區域 -->
+    <div class="glass-card p-6 md:px-10 flex justify-between items-center bg-white/70">
+        <div>
+            <h3 class="text-[1.1rem] font-bold text-apple-text tracking-tight mb-1" data-i18n="userCountTitle">👥 網頁版 App 使用人數</h3>
+        </div>
+        <div class="text-4xl md:text-5xl font-black tracking-tight text-apple-blue drop-shadow-sm" id="totalUserCount">0</div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        <!-- 左側面板 -->
+        <div class="lg:col-span-5 flex flex-col gap-6">
+            <div class="panel" id="editPanel">
+                <div class="panel-header">
+                    <span class="panel-title" data-i18n="editPanelTitle">✏️ 寫入/修改數據 (Update)</span>
+                </div>
+                <div class="flex flex-col gap-4">
+                    <div>
+                        <label class="apple-label" data-i18n="tagLabel">標籤名稱 (Tag)</label>
+                        <input type="text" id="inputTag" class="apple-input" data-i18n-ph="tagPH" placeholder="如: temp, speed...">
+                    </div>
+                    <div>
+                        <label class="apple-label" data-i18n="valueLabel">標籤值 (Value)</label>
+                        <textarea id="inputValue" class="apple-input" data-i18n-ph="valPH" placeholder="輸入數字或文本"></textarea>
+                    </div>
+                    <button class="apple-btn btn-primary w-full py-3 mt-2" onclick="saveData()" data-i18n="btnSubmit">提交保存</button>
+                </div>
+            </div>
+
+            <div class="panel flex-1">
+                <div class="panel-header mb-4">
+                    <span class="panel-title" data-i18n="tableTitle">📋 數據總覽</span>
+                    <input type="text" id="searchInput" class="apple-input !py-1.5 !px-3 !w-32 !text-sm" data-i18n-ph="searchPH" placeholder="搜尋..." oninput="filterTable()">
+                </div>
+                <div class="table-container">
+                    <table class="w-full text-left text-sm whitespace-nowrap">
+                        <thead>
+                            <tr>
+                                <th data-i18n="thTag">Tag (標籤)</th>
+                                <th data-i18n="thNote">備註</th>
+                                <th data-i18n="thVal">Value (數值)</th>
+                                <th id="thActions" data-i18n="thActions">操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="dataTableBody">
+                            <tr><td colspan="4" class="text-center py-8 text-apple-subtext font-medium" data-i18n="loading">讀取中...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- 右側面板 -->
+        <div class="lg:col-span-7">
+            <div class="panel h-full min-h-[500px]">
+                <div class="panel-header">
+                    <span class="panel-title" data-i18n="chartPanelTitle">📊 數值型數據歷史趨勢 (折線圖)</span>
+                </div>
+                <div id="chartsGrid" class="grid grid-cols-1 md:grid-cols-2 gap-5">
+                    <div class="col-span-full text-center text-apple-subtext font-medium py-12" data-i18n="noNumericData">
+                        尚無數據或未檢測到數值型 Tag
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="toast"></div>
+
+<!-- 🎫 QR Code 生成彈窗 -->
+<div id="qrModal" class="modal-overlay" style="display:none;">
+    <div class="modal-content">
+        <h3 id="qrTitle" class="text-xl font-bold mb-6 text-apple-text">積分 QR Code</h3>
+        <div id="qrcode-display" class="flex justify-center mb-8 p-4 bg-white rounded-2xl shadow-sm border border-gray-100 mx-auto w-fit"></div>
+        <button class="apple-btn btn-secondary w-full py-3" onclick="closeQRModal()" data-i18n="btnCloseModal">關閉視窗</button>
+    </div>
+</div>
+
+<!-- 📷 禮品兌換：相機掃碼彈窗 -->
+<div id="giftScanModal" class="modal-overlay" style="display:none;">
+    <div class="modal-content !max-w-md">
+        <h3 class="text-xl font-bold text-apple-text" data-i18n="giftScanTitle">📷 掃描禮品兌換碼</h3>
+        <div id="giftReader" class="w-full my-6 bg-black/5 rounded-[1.5rem]"></div>
+        <button class="apple-btn btn-secondary w-full py-3" onclick="closeGiftScanModal()" data-i18n="btnCloseModal">關閉視窗</button>
+    </div>
+</div>
+
+<!-- 🎁 禮品兌換：明細與核銷確認頁面彈窗 -->
+<div id="giftDetailModal" class="modal-overlay" style="display:none;">
+    <div class="modal-content !max-w-md !text-left">
+        <h3 class="text-xl font-bold text-center mb-6 text-apple-text" data-i18n="giftConfirmTitle">🎁 禮品兌換核銷</h3>
+        <div id="giftDetailBody" class="space-y-4"></div>
+        <div id="giftDetailActions" class="flex gap-3 mt-8"></div>
+    </div>
+</div>
+
+<script>
+    const i18nData = {
+        'zh-TW': {
+            appTitle: "Pharm-E-co服務器數據管理台",
+            loginSub: "服務器數據管理台",
+            loginUserPH: "請輸入使用者名稱",
+            loginPassPH: "請輸入密碼",
+            btnLogin: "登入",
+            btnScanLogin: "📷 掃碼登入",
+            dashTitle: "Pharm-E-co數據管理台",
+            btnCustomQR: "🎫 自定義數量積分",
+            btnRedeemGift: "🎁 兌換禮品",
+            unitSec: "秒",
+            btnRefresh: "🔄 刷新",
+            btnLogout: "🚪 登出",
+            apiUrlLabel: "API 接口地址",
+            apiUserLabel: "服務器用戶名 (user)",
+            apiSecretLabel: "服務器密鑰 (secret)",
+            editPanelTitle: "✏️ 寫入/修改數據 (Update)",
+            tagLabel: "標籤名稱 (Tag)",
+            valueLabel: "標籤值 (Value)",
+            tagPH: "如: temp, speed...",
+            valPH: "輸入數字或文本",
+            btnSubmit: "提交保存",
+            tableTitle: "📋 數據總覽",
+            searchPH: "搜尋...",
+            thTag: "Tag (標籤)",
+            thNote: "備註",
+            thVal: "Value (數值)",
+            thActions: "操作",
+            loading: "讀取中...",
+            emptyTable: "數據庫為空",
+            chartPanelTitle: "📊 數值型數據歷史趨勢 (折線圖)",
+            noNumericData: "尚無數據或未檢測到數值型 Tag",
+            btnCloseModal: "關閉視窗",
+            roleAdmin: "身分: 👑 管理員",
+            roleGuest: "身分: 👁️ 訪客模式",
+            statusOnline: "在線",
+            statusLoading: "加載中...",
+            statusError: "錯誤",
+            valCurrent: "當前",
+            btnEditVal: "改值",
+            btnNoteEdit: "備註",
+            btnDel: "刪除",
+            errAuthFail: "❌ 帳號或密碼錯誤！",
+            errInvalidQR: "❌ 無效的權限碼: ",
+            promptNote: "請輸入標籤 [{tag}] 的備註（留空並確定將刪除備註）：",
+            confirmDel: "確定要刪除標籤 [{tag}] 嗎？",
+            promptPoints: "請輸入要生成的積分數量 (範圍：1 - 9999)：",
+            errPointsRange: "⚠️ 只能輸入 1 到 9999 之間的純數字！",
+            qrGenSuccess: "生成成功：{num} 積分",
+            toastNoteDel: "已刪除 [{tag}] 的備註",
+            toastNoteSaved: "已保存 [{tag}] 的備註",
+            toastDataRefreshed: "數據更新成功",
+            toastConnFailed: "服務器連線失敗",
+            toastSaved: "已保存: ",
+            toastDeleted: "已刪除: ",
+            userCountTitle: "👥 網頁版 App 使用人數",
+            userCountSub: "所有以 VIS 開頭的標籤總數量",
+            giftScanTitle: "📷 掃描禮品兌換碼",
+            giftConfirmTitle: "🎁 禮品兌換核銷",
+            btnConfirmRedeem: "✅ 確認核銷",
+            btnCancel: "取消",
+            errOrdNotFound: "❌ 未找到對應以 ORD 開頭的訂單標籤！",
+            errInvalidGiftFormat: "⚠️ 標籤內容格式不符 (無禮品資料)！",
+            toastRedeemSuccess: "🎉 已成功核銷，刪除標籤：",
+            lp1Name: "立牌",
+            lp2Name: "鑰匙扣"
+        },
+        'en': {
+            appTitle: "Pharm-E-co Server Data Dashboard",
+            loginSub: "Server Data Management Dashboard",
+            loginUserPH: "Enter Username",
+            loginPassPH: "Enter Password",
+            btnLogin: "Login",
+            btnScanLogin: "📷 QR Login",
+            dashTitle: "Pharm-E-co Dashboard",
+            btnCustomQR: "🎫 Custom Points QR",
+            btnRedeemGift: "🎁 Redeem Gift",
+            unitSec: "s",
+            btnRefresh: "🔄 Refresh",
+            btnLogout: "🚪 Logout",
+            apiUrlLabel: "API Endpoint URL",
+            apiUserLabel: "Server Username (user)",
+            apiSecretLabel: "Server Secret Key (secret)",
+            editPanelTitle: "✏️ Write / Update Data",
+            tagLabel: "Tag Name",
+            valueLabel: "Tag Value",
+            tagPH: "e.g., temp, speed...",
+            valPH: "Enter number or text",
+            btnSubmit: "Submit & Save",
+            tableTitle: "📋 Data Overview",
+            searchPH: "Search...",
+            thTag: "Tag",
+            thNote: "Note",
+            thVal: "Value",
+            thActions: "Actions",
+            loading: "Loading...",
+            emptyTable: "Database is empty",
+            chartPanelTitle: "📊 Numeric Data History",
+            noNumericData: "No numeric tags detected",
+            btnCloseModal: "Close",
+            roleAdmin: "Role: 👑 Admin",
+            roleGuest: "Role: 👁️ Guest",
+            statusOnline: "Online",
+            statusLoading: "Loading...",
+            statusError: "Error",
+            valCurrent: "Current",
+            btnEditVal: "Edit",
+            btnNoteEdit: "Note",
+            btnDel: "Del",
+            errAuthFail: "❌ Invalid username or password!",
+            errInvalidQR: "❌ Invalid QR Code: ",
+            promptNote: "Enter note for tag [{tag}] (Leave empty to delete):",
+            confirmDel: "Are you sure you want to delete tag [{tag}]?",
+            promptPoints: "Enter point amount to generate (Range: 1 - 9999):",
+            errPointsRange: "⚠️ Please enter a number between 1 and 9999!",
+            qrGenSuccess: "Generated: {num} Points",
+            toastNoteDel: "Deleted note for [{tag}]",
+            toastNoteSaved: "Saved note for [{tag}]",
+            toastDataRefreshed: "Data updated successfully",
+            toastConnFailed: "Server connection failed",
+            toastSaved: "Saved: ",
+            toastDeleted: "Deleted: ",
+            userCountTitle: "👥 Web App Users",
+            userCountSub: "Total count of tags starting with VIS",
+            giftScanTitle: "📷 Scan Gift QR Code",
+            giftConfirmTitle: "🎁 Redeem Gift Confirmation",
+            btnConfirmRedeem: "✅ Confirm Redeem",
+            btnCancel: "Cancel",
+            errOrdNotFound: "❌ No matching ORD tag found!",
+            errInvalidGiftFormat: "⚠️ Tag value format invalid!",
+            toastRedeemSuccess: "🎉 Redeemed & deleted tag: ",
+            lp1Name: "Acrylic Standee",
+            lp2Name: "Keychain"
+        }
+    };
+
+    let currentLang = 'zh-TW';
+    let currentUserRole = null; 
+    let globalData = [];
+    let tagHistory = {};       
+    let chartInstances = {};   
+    let countdown = 20;
+    let timerInterval = null;
+    let html5QrcodeScanner = null;
+    let giftQrcodeScanner = null;
+    let currentRedeemTag = null;
+
+    function safeParseJSON(rawText) {
+        if (!rawText) return null;
+        if (typeof rawText === 'object') return rawText;
+        let str = String(rawText).trim().replace(/^\uFEFF/, '');
+        const firstBrace = str.indexOf('{');
+        const lastBrace = str.lastIndexOf('}');
+        const firstBracket = str.indexOf('[');
+        const lastBracket = str.lastIndexOf(']');
+        let start = -1, end = -1;
+        if (firstBrace !== -1 && (firstBracket === -1 || firstBrace < firstBracket)) {
+            start = firstBrace; end = lastBrace;
+        } else if (firstBracket !== -1) {
+            start = firstBracket; end = lastBracket;
+        }
+        if (start !== -1 && end !== -1 && end > start) {
+            str = str.substring(start, end + 1);
+        }
+        try { return JSON.parse(str); } catch (e) {}
+        try {
+            let clean = str.replace(/,\s*([\}\]])/g, '$1').replace(/[\r\n\t]/g, ' ').replace(/\\'/g, "'");
+            return JSON.parse(clean);
+        } catch (e) {}
+        return null;
+    }
+
+    function setLanguage(lang) {
+        currentLang = lang;
+        localStorage.setItem('pharm_lang', lang);
+        const dict = i18nData[lang];
+        document.querySelectorAll('[data-i18n]').forEach(el => {
+            const key = el.getAttribute('data-i18n');
+            if (dict[key]) {
+                if(key === 'dashTitle') el.innerHTML = `<span class="text-apple-blue">📈</span> ${dict[key]}`;
+                else el.innerText = dict[key];
+            }
+        });
+        document.querySelectorAll('[data-i18n-ph]').forEach(el => {
+            const key = el.getAttribute('data-i18n-ph');
+            if (dict[key]) el.placeholder = dict[key];
+        });
+        if (currentUserRole) {
+            document.getElementById('displayRole').innerText = currentUserRole === 'admin' ? dict.roleAdmin : dict.roleGuest;
+            renderTable(globalData);
+            const currentNumericTags = new Set(Object.keys(chartInstances));
+            updateLineCharts(currentNumericTags);
+        }
+    }
+
+    function toggleLanguage() {
+        const nextLang = currentLang === 'zh-TW' ? 'en' : 'zh-TW';
+        setLanguage(nextLang);
+    }
+
+    function selectInitialLanguage(lang) {
+        setLanguage(lang);
+        document.getElementById('firstLangModal').style.display = 'none';
+    }
+
+    function getNotes() {
+        try { return JSON.parse(localStorage.getItem('pharm_tag_notes') || '{}'); } catch (e) { return {}; }
+    }
+
+    function editNotePrompt(tag) {
+        if (currentUserRole !== 'admin') return;
+        const dict = i18nData[currentLang];
+        const notes = getNotes();
+        const currentNote = notes[tag] || '';
+        const promptMsg = dict.promptNote.replace('{tag}', tag);
+        const newNote = prompt(promptMsg, currentNote);
+        if (newNote !== null) {
+            const trimmed = newNote.trim();
+            if (trimmed === '') {
+                delete notes[tag];
+                showToast(dict.toastNoteDel.replace('{tag}', tag));
+            } else {
+                notes[tag] = trimmed;
+                showToast(dict.toastNoteSaved.replace('{tag}', tag));
+            }
+            localStorage.setItem('pharm_tag_notes', JSON.stringify(notes));
+            renderTable(globalData);
+            const currentNumericTags = new Set(Object.keys(chartInstances));
+            updateLineCharts(currentNumericTags);
+        }
+    }
+
+    window.onload = () => {
+        const savedLang = localStorage.getItem('pharm_lang');
+        if (!savedLang) document.getElementById('firstLangModal').style.display = 'flex';
+        else setLanguage(savedLang);
+        const savedRole = localStorage.getItem('pharm_role');
+        if (savedRole === 'admin' || savedRole === 'guest') enterDashboard(savedRole);
+    };
+
+    function handleLogin() {
+        const user = document.getElementById('loginUser').value.trim();
+        const pass = document.getElementById('loginPass').value.trim();
+        verifyCredentials(user, pass);
+    }
+
+    function verifyCredentials(user, pass) {
+        const err = document.getElementById('loginError');
+        const dict = i18nData[currentLang];
+        if (user === 'PLKCWC' && pass === 'PLKCWC') {
+            err.style.display = 'none';
+            enterDashboard('admin');
+        } else if (user === 'User' && pass === 'PH11') {
+            err.style.display = 'none';
+            enterDashboard('guest');
+        } else {
+            err.innerText = dict.errAuthFail;
+            err.style.display = 'block';
+        }
+    }
+
+    function startQRScanner() {
+        const readerDiv = document.getElementById('reader');
+        readerDiv.style.display = 'block';
+        document.getElementById('loginError').style.display = 'none';
+        if (html5QrcodeScanner && html5QrcodeScanner.isScanning) return;
+        if (!html5QrcodeScanner) html5QrcodeScanner = new Html5Qrcode("reader");
+        html5QrcodeScanner.start(
+            { facingMode: "environment" }, 
+            { fps: 10, qrbox: { width: 220, height: 220 } },
+            (decodedText) => {
+                const scanResult = decodedText.trim();
+                const dict = i18nData[currentLang];
+                html5QrcodeScanner.stop().then(() => {
+                    readerDiv.style.display = 'none';
+                    if (scanResult === 'PLKCWC/PLKCWC') enterDashboard('admin');
+                    else if (scanResult === 'User/PH11') enterDashboard('guest');
+                    else {
+                        const err = document.getElementById('loginError');
+                        err.innerText = `${dict.errInvalidQR}[${scanResult}]`;
+                        err.style.display = 'block';
+                    }
+                }).catch((err) => console.error(err));
+            },
+            (errorMessage) => {}
+        ).catch(err => {
+            alert("Camera initialization failed!");
+            readerDiv.style.display = 'none';
+        });
+    }
+
+    function enterDashboard(role) {
+        currentUserRole = role;
+        localStorage.setItem('pharm_role', role);
+        if (html5QrcodeScanner && html5QrcodeScanner.isScanning) html5QrcodeScanner.stop().catch(()=>{});
+        document.getElementById('loginScreen').style.display = 'none';
+        document.getElementById('mainApp').style.display = 'block';
+        const dict = i18nData[currentLang];
+        if (role === 'admin') {
+            document.getElementById('displayRole').innerText = dict.roleAdmin;
+            document.getElementById('configCard').style.display = 'grid';
+            document.getElementById('editPanel').style.display = 'block';
+            document.getElementById('btnCustomQR').style.display = 'flex';
+            document.getElementById('btnRedeemGift').style.display = 'flex';
+            document.getElementById('thActions').style.display = 'table-cell';
+        } else if (role === 'guest') {
+            document.getElementById('displayRole').innerText = dict.roleGuest;
+            document.getElementById('configCard').style.display = 'none';
+            document.getElementById('editPanel').style.display = 'none';
+            document.getElementById('btnCustomQR').style.display = 'none';
+            document.getElementById('btnRedeemGift').style.display = 'none';
+            document.getElementById('thActions').style.display = 'none';
+        }
+        startTimer();
+        refreshData(true);
+    }
+
+    function logout() {
+        localStorage.removeItem('pharm_role');
+        currentUserRole = null;
+        if (timerInterval) clearInterval(timerInterval);
+        document.getElementById('loginUser').value = '';
+        document.getElementById('loginPass').value = '';
+        document.getElementById('mainApp').style.display = 'none';
+        document.getElementById('loginScreen').style.display = 'flex';
+    }
+
+    function startTimer() {
+        if (timerInterval) clearInterval(timerInterval);
+        countdown = 20;
+        document.getElementById('timerSec').innerText = countdown;
+        timerInterval = setInterval(() => {
+            countdown--;
+            document.getElementById('timerSec').innerText = countdown;
+            if (countdown <= 0) {
+                countdown = 20;
+                refreshData(true);
+            }
+        }, 1000);
+    }
+
+    function manualRefresh() {
+        refreshData(false);
+        countdown = 20;
+        document.getElementById('timerSec').innerText = countdown;
+    }
+
+    function getSafeId(tag) { return 'tag_' + btoa(unescape(encodeURIComponent(tag))).replace(/=/g, '').replace(/[^a-zA-Z0-9]/g, '_'); }
+
+    async function apiPost(action, extraParams = {}) {
+        const url = document.getElementById('apiUrl').value.trim();
+        const user = document.getElementById('apiUser').value.trim();
+        const secret = document.getElementById('apiSecret').value.trim();
+        const formData = new URLSearchParams();
+        formData.append('user', user);
+        formData.append('secret', secret);
+        formData.append('action', action);
+        for (const key in extraParams) formData.append(key, extraParams[key]);
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
+            body: formData.toString()
+        });
+        if (!response.ok) throw new Error('HTTP ' + response.status);
+        const rawText = await response.text();
+        const parsed = safeParseJSON(rawText);
+        return parsed !== null ? parsed : rawText;
+    }
+
+    async function refreshData(isAuto = false) {
+        const dict = i18nData[currentLang];
+        try {
+            document.getElementById('apiStatus').innerText = dict.statusLoading;
+            const res = await apiPost('search', { tag: '', type: 'both', no: 1, count: 100 });
+            document.getElementById('apiStatus').innerText = dict.statusOnline;
+            let parsedList = [];
+            if (Array.isArray(res)) {
+                if (res.length > 0 && Array.isArray(res[0])) parsedList = res.map(item => ({ tag: String(item[0]), value: String(item[1]) }));
+                else if (res[0] === 'VALUE') parsedList = [{ tag: String(res[1]), value: String(res[2]) }];
+                else parsedList = res.map((item, idx) => ({ tag: `Item_${idx}`, value: JSON.stringify(item) }));
+            } else if (typeof res === 'object' && res !== null) {
+                parsedList = Object.keys(res).map(k => ({ tag: k, value: typeof res[k] === 'object' ? JSON.stringify(res[k]) : String(res[k]) }));
+            } else parsedList = [{ tag: 'Unknown', value: String(res) }];
+            globalData = parsedList;
+            renderTable(globalData);
+            let totalUsers = 0;
+            parsedList.forEach(item => { if (item.tag && String(item.tag).trim().toUpperCase().startsWith('VIS')) totalUsers++; });
+            document.getElementById('totalUserCount').innerText = totalUsers.toLocaleString();
+            const now = new Date();
+            const timeStr = now.toTimeString().split(' ')[0]; 
+            const currentNumericTags = new Set();
+            parsedList.forEach(item => {
+                const valNum = parseFloat(item.value);
+                if (!isNaN(valNum) && item.value.trim() !== '') {
+                    currentNumericTags.add(item.tag);
+                    if (!tagHistory[item.tag]) tagHistory[item.tag] = [];
+                    if (tagHistory[item.tag].length >= 15) tagHistory[item.tag].shift();
+                    tagHistory[item.tag].push({ time: timeStr, value: valNum });
+                }
+            });
+            updateLineCharts(currentNumericTags);
+            if (!isAuto) showToast(dict.toastDataRefreshed);
+        } catch (e) {
+            document.getElementById('apiStatus').innerText = dict.statusError;
+            if(!isAuto) showToast(dict.toastConnFailed);
+        }
+    }
+
+    function renderTable(data) {
+        const tbody = document.getElementById('dataTableBody');
+        tbody.innerHTML = '';
+        const notes = getNotes();
+        const dict = i18nData[currentLang];
+        if (data.length === 0) {
+            const colspan = currentUserRole === 'admin' ? 4 : 3;
+            tbody.innerHTML = `<tr><td colspan="${colspan}" class="text-center py-8 text-apple-subtext font-medium">${dict.emptyTable}</td></tr>`;
+            return;
+        }
+        data.forEach(item => {
+            const tr = document.createElement('tr');
+            const noteText = notes[item.tag] ? `<span class="tag-note">${escapeHtml(notes[item.tag])}</span>` : '<span style="color:#9ca3af; font-size:0.8rem;">-</span>';
+            let html = `
+                <td><strong>${escapeHtml(item.tag)}</strong></td>
+                <td>${noteText}</td>
+                <td><code class="font-mono text-[0.85rem] bg-white/40 px-2 py-1 rounded-md text-apple-blue">${escapeHtml(item.value)}</code></td>
+            `;
+            if (currentUserRole === 'admin') {
+                html += `
+                <td>
+                    <div class="flex gap-1.5">
+                        <button class="apple-btn btn-secondary !py-1 !px-2.5 !text-[0.75rem]" onclick="editTag('${escapeJs(item.tag)}', '${escapeJs(item.value)}')">${dict.btnEditVal}</button>
+                        <button class="apple-btn btn-secondary !py-1 !px-2.5 !text-[0.75rem]" onclick="editNotePrompt('${escapeJs(item.tag)}')">${dict.btnNoteEdit}</button>
+                        <button class="apple-btn btn-danger !py-1 !px-2.5 !text-[0.75rem]" onclick="deleteTag('${escapeJs(item.tag)}')">${dict.btnDel}</button>
+                    </div>
+                </td>`;
+            }
+            tr.innerHTML = html;
+            tbody.appendChild(tr);
+        });
+    }
+
+    function updateLineCharts(numericTagsSet) {
+        const container = document.getElementById('chartsGrid');
+        const notes = getNotes();
+        const dict = i18nData[currentLang];
+        for (let tag in chartInstances) {
+            if (!numericTagsSet.has(tag)) {
+                chartInstances[tag].destroy();
+                delete chartInstances[tag];
+                const card = document.getElementById(`card_${getSafeId(tag)}`);
+                if (card) card.remove();
+            }
+        }
+        if (numericTagsSet.size === 0) {
+            container.innerHTML = `<div class="col-span-full text-center text-apple-subtext font-medium py-12">${dict.noNumericData}</div>`;
+            return;
+        }
+        if (container.children.length === 1 && (container.children[0].innerText.includes('尚無數據') || container.children[0].innerText.includes('No numeric'))) {
+            container.innerHTML = '';
+        }
+        numericTagsSet.forEach(tag => {
+            const safeId = getSafeId(tag);
+            let card = document.getElementById(`card_${safeId}`);
+            const noteDisplay = notes[tag] ? `<span class="tag-note">${escapeHtml(notes[tag])}</span>` : '';
+            if (!card) {
+                card = document.createElement('div');
+                card.id = `card_${safeId}`;
+                card.className = 'glass-card chart-card bg-white/40 border-white/40 shadow-sm';
+                card.innerHTML = `
+                    <div class="panel-header !mb-2">
+                        <span class="panel-title text-[0.95rem]" id="title_${safeId}">📌 ${escapeHtml(tag)} ${noteDisplay}</span>
+                        <span class="latest-val" id="val_${safeId}">--</span>
+                    </div>
+                    <div class="relative w-full h-[180px]"><canvas id="canvas_${safeId}"></canvas></div>
+                `;
+                container.appendChild(card);
+            } else {
+                const titleEl = document.getElementById(`title_${safeId}`);
+                if (titleEl) titleEl.innerHTML = `📌 ${escapeHtml(tag)} ${noteDisplay}`;
+            }
+            const history = tagHistory[tag] || [];
+            const latest = history.length > 0 ? history[history.length - 1].value : '--';
+            document.getElementById(`val_${safeId}`).innerText = `${dict.valCurrent}: ${latest}`;
+            const ctx = document.getElementById(`canvas_${safeId}`).getContext('2d');
+            const labels = history.map(h => h.time);
+            const dataValues = history.map(h => h.value);
+            if (chartInstances[tag]) {
+                chartInstances[tag].data.labels = labels;
+                chartInstances[tag].data.datasets[0].data = dataValues;
+                chartInstances[tag].update();
+            } else {
+                chartInstances[tag] = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: labels,
+                        datasets: [{ label: tag, data: dataValues, borderColor: '#0071e3', backgroundColor: 'rgba(0, 113, 227, 0.2)', borderWidth: 2, fill: true, tension: 0.4, pointRadius: 2, pointHoverRadius: 4 }]
+                    },
+                    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { grid: { display: false }, ticks: { font: { size: 10, family: 'system-ui' }, color: '#505055' } }, y: { border: { display: false }, grid: { color: 'rgba(0,0,0,0.08)' }, ticks: { font: { size: 10, family: 'system-ui' }, color: '#505055' } } } }
+                });
+            }
+        });
+    }
+
+    async function saveData() {
+        if (currentUserRole !== 'admin') return;
+        const dict = i18nData[currentLang];
+        const tag = document.getElementById('inputTag').value.trim();
+        const value = document.getElementById('inputValue').value.trim();
+        if (!tag) { alert('Tag is required!'); return; }
+        try {
+            await apiPost('update', { tag: tag, value: value });
+            showToast(`${dict.toastSaved}${tag}`);
+            document.getElementById('inputTag').value = '';
+            document.getElementById('inputValue').value = '';
+            manualRefresh();
+        } catch (e) { showToast('Error'); }
+    }
+
+    async function deleteTag(tag) {
+        if (currentUserRole !== 'admin') return;
+        const dict = i18nData[currentLang];
+        if (!confirm(dict.confirmDel.replace('{tag}', tag))) return;
+        try {
+            await apiPost('delete', { tag: tag });
+            showToast(`${dict.toastDeleted}${tag}`);
+            manualRefresh();
+        } catch (e) { showToast('Error'); }
+    }
+
+    function editTag(tag, value) {
+        if (currentUserRole !== 'admin') return;
+        document.getElementById('inputTag').value = tag;
+        document.getElementById('inputValue').value = value;
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function generateCustomPointsQR() {
+        if (currentUserRole !== 'admin') return;
+        const dict = i18nData[currentLang];
+        let input = prompt(dict.promptPoints);
+        if (input === null) return; 
+        let num = parseInt(input, 10);
+        if (isNaN(num) || num < 1 || num > 9999) { alert(dict.errPointsRange); return; }
+        document.getElementById('qrModal').style.display = 'flex';
+        document.getElementById('qrTitle').innerText = dict.qrGenSuccess.replace('{num}', num);
+        const qrContainer = document.getElementById('qrcode-display');
+        qrContainer.innerHTML = '';
+        new QRCode(qrContainer, { text: String(num), width: 220, height: 220, colorDark : "#1d1d1f", colorLight : "#ffffff", correctLevel : QRCode.CorrectLevel.H });
+    }
+
+    function closeQRModal() { document.getElementById('qrModal').style.display = 'none'; }
+
+    function parseGiftContent(contentStr) {
+        let lp1Count = 0; let lp2Count = 0;
+        if (!contentStr) return { total: 0, lp1: 0, lp2: 0, raw: '' };
+        const parts = String(contentStr).split(',');
+        parts.forEach(part => {
+            const clean = part.trim().toUpperCase();
+            if (clean.includes('LP1')) { const m = clean.match(/LP1\s*-\s*(\d+)/); if (m) lp1Count += parseInt(m[1], 10); }
+            if (clean.includes('LP2')) { const m = clean.match(/LP2\s*-\s*(\d+)/); if (m) lp2Count += parseInt(m[1], 10); }
+        });
+        return { total: lp1Count + lp2Count, lp1: lp1Count, lp2: lp2Count, raw: contentStr };
+    }
+
+    function startGiftRedeemScanner() {
+        if (currentUserRole !== 'admin') return;
+        const modal = document.getElementById('giftScanModal');
+        modal.style.display = 'flex';
+        if (giftQrcodeScanner && giftQrcodeScanner.isScanning) return;
+        if (!giftQrcodeScanner) giftQrcodeScanner = new Html5Qrcode("giftReader");
+        giftQrcodeScanner.start(
+            { facingMode: "environment" },
+            { fps: 10, qrbox: { width: 220, height: 220 } },
+            (decodedText) => {
+                giftQrcodeScanner.stop().then(() => {
+                    modal.style.display = 'none';
+                    handleScannedGiftCode(decodedText);
+                }).catch(err => console.error(err));
+            },
+            (errorMessage) => {}
+        ).catch(err => {
+            modal.style.display = 'none';
+            showGiftError("相機啟動失敗，請確保允許權限。");
+        });
+    }
+
+    function closeGiftScanModal() {
+        if (giftQrcodeScanner && giftQrcodeScanner.isScanning) {
+            giftQrcodeScanner.stop().then(() => { document.getElementById('giftScanModal').style.display = 'none'; }).catch(() => { document.getElementById('giftScanModal').style.display = 'none'; });
+        } else { document.getElementById('giftScanModal').style.display = 'none'; }
+    }
+
+    function handleScannedGiftCode(scannedText) {
+        const rawText = scannedText.trim();
+        const dict = i18nData[currentLang];
+        if (!rawText) return;
+        const ordMatch = rawText.match(/ORD[A-Za-z0-9_-]*/i);
+        const targetCode = ordMatch ? ordMatch[0].toLowerCase() : rawText.toLowerCase();
+        let foundItem = globalData.find(d => {
+            const tagStr = String(d.tag).trim().toLowerCase();
+            const rawLower = rawText.toLowerCase();
+            if (tagStr === rawLower || tagStr === targetCode) return true;
+            if (tagStr.includes(targetCode)) return true;
+            if (targetCode.includes(tagStr) && tagStr.length >= 3) return true;
+            const cleanTag = tagStr.replace(/[^a-z0-9]/g, '');
+            const cleanTarget = targetCode.replace(/[^a-z0-9]/g, '');
+            if (cleanTag && cleanTarget && (cleanTag === cleanTarget || cleanTag.includes(cleanTarget) || cleanTarget.includes(cleanTag))) return true;
+            return false;
+        });
+        if (!foundItem && targetCode) foundItem = globalData.find(d => String(d.value).toLowerCase().includes(targetCode));
+        if (foundItem) showGiftDetail(foundItem.tag, foundItem.value);
+        else showGiftError(`${dict.errOrdNotFound}<br><span class="text-apple-subtext text-[0.85rem] mt-2 block font-normal">[內容: ${escapeHtml(rawText)}]</span>`);
+    }
+
+    function showGiftDetail(tag, value) {
+        currentRedeemTag = tag;
+        const dict = i18nData[currentLang];
+        const giftInfo = parseGiftContent(value);
+        const body = document.getElementById('giftDetailBody');
+        const actions = document.getElementById('giftDetailActions');
+        if (giftInfo.total === 0 && !value.toUpperCase().includes('LP')) {
+            body.innerHTML = `
+                <div class="text-center text-apple-red font-bold py-3 text-lg">${dict.errInvalidGiftFormat}</div>
+                <div class="text-[0.85rem] text-apple-subtext bg-white/40 p-4 rounded-2xl break-all">
+                    Tag: <b class="text-apple-text">${escapeHtml(tag)}</b><br>Value: ${escapeHtml(value)}
+                </div>
+            `;
+            actions.innerHTML = `<button class="apple-btn btn-secondary w-full py-3.5" onclick="closeGiftDetailModal()">${dict.btnCloseModal}</button>`;
+        } else {
+            body.innerHTML = `
+                <div class="bg-apple-blue/15 p-4 rounded-2xl border border-apple-blue/30 mb-4">
+                    <div class="text-[0.8rem] text-apple-blue font-bold mb-1">訂單標籤 (Tag):</div>
+                    <div class="text-xl font-bold text-apple-text font-mono tracking-tight">${escapeHtml(tag)}</div>
+                </div>
+                <div class="flex justify-between items-center bg-white/70 p-4 rounded-2xl shadow-sm border border-white/50 mb-4">
+                    <span class="font-bold text-apple-text text-[1rem]">🎁 禮品總數量</span>
+                    <span class="text-2xl font-black text-apple-blue">${giftInfo.total} 個</span>
+                </div>
+                <div class="bg-white/70 p-4 rounded-2xl shadow-sm border border-white/50 text-[0.95rem]">
+                    <div class="font-bold text-apple-subtext mb-3">禮品種類明細</div>
+                    <ul class="flex flex-col gap-3">
+                        <li class="flex justify-between pb-3 border-b border-white/80">
+                            <span class="font-medium">🪧 ${dict.lp1Name} (LP1)</span>
+                            <span class="font-bold text-apple-text">${giftInfo.lp1} 個</span>
+                        </li>
+                        <li class="flex justify-between">
+                            <span class="font-medium">🔑 ${dict.lp2Name} (LP2)</span>
+                            <span class="font-bold text-apple-text">${giftInfo.lp2} 個</span>
+                        </li>
+                    </ul>
+                </div>
+            `;
+            actions.innerHTML = `
+                <button class="apple-btn btn-secondary flex-1 py-3.5" onclick="closeGiftDetailModal()">${dict.btnCancel}</button>
+                <button class="apple-btn btn-primary flex-1 py-3.5" onclick="confirmRedeemGift()">${dict.btnConfirmRedeem}</button>
+            `;
+        }
+        document.getElementById('giftDetailModal').style.display = 'flex';
+    }
+
+    function showGiftError(msgHtml) {
+        const dict = i18nData[currentLang];
+        const body = document.getElementById('giftDetailBody');
+        const actions = document.getElementById('giftDetailActions');
+        body.innerHTML = `<div class="text-center py-6"><div class="text-apple-red font-bold text-[1.05rem] leading-relaxed">${msgHtml}</div></div>`;
+        actions.innerHTML = `<button class="apple-btn btn-secondary w-full py-3.5" onclick="closeGiftDetailModal()">${dict.btnCloseModal}</button>`;
+        document.getElementById('giftDetailModal').style.display = 'flex';
+    }
+
+    function closeGiftDetailModal() {
+        document.getElementById('giftDetailModal').style.display = 'none';
+        currentRedeemTag = null;
+    }
+
+    async function confirmRedeemGift() {
+        if (!currentRedeemTag || currentUserRole !== 'admin') return;
+        const dict = i18nData[currentLang];
+        try {
+            await apiPost('delete', { tag: currentRedeemTag });
+            showToast(`${dict.toastRedeemSuccess}${currentRedeemTag}`);
+            closeGiftDetailModal();
+            manualRefresh();
+        } catch (e) { showToast('核銷失敗，請重試'); }
+    }
+
+    function filterTable() {
+        const query = document.getElementById('searchInput').value.toLowerCase();
+        const notes = getNotes();
+        renderTable(globalData.filter(d => {
+            const note = (notes[d.tag] || '').toLowerCase();
+            return d.tag.toLowerCase().includes(query) || d.value.toLowerCase().includes(query) || note.includes(query);
+        }));
+    }
+
+    function showToast(msg) {
+        const toast = document.getElementById('toast');
+        toast.innerText = msg;
+        toast.style.display = 'block';
+        setTimeout(() => { toast.style.display = 'none'; }, 3000);
+    }
+
+    function escapeHtml(str) { return String(str).replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[m])); }
+    function escapeJs(str) { return String(str).replace(/'/g, "\\'").replace(/"/g, '\\"'); }
+</script>
+</body>
+</html>
